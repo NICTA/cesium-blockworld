@@ -101,6 +101,7 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
         freeResources : function() {
           if (Cesium.defined(this.primitive)) {
             this.primitive.destroy();
+            this.sides.destroy();
             this.primitive = undefined;
           }
         }
