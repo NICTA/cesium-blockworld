@@ -1,6 +1,6 @@
 var detailFactor = 4.0;
 var colourQuantize = 6.0;
-var heightScale = 50.0;
+var heightScale = 20.0;
 var granularityMultiplier = 20;
 var subgridCount = 2;
 
@@ -64,7 +64,7 @@ var terrainProvider = new Cesium.CesiumTerrainProvider({
   url : '//cesiumjs.org/smallterrain'
 });
 
-function subdivide(r, iterations) {
+function subdivideRect(r, iterations) {
   var x, y;
   var result = [];
   for (y = 0; y < iterations; ++y) {
@@ -84,6 +84,15 @@ function subdivide(r, iterations) {
     }
   }
   return result;
+}
+
+function rectDimension(r) {
+  var nw = Cesium.Ellipsoid.WGS84.cartographicToCartesian(Cesium.Rectangle.northwest(r));
+  var se = Cesium.Ellipsoid.WGS84.cartographicToCartesian(Cesium.Rectangle.southeast(r));
+  var dx = nw.x - se.x;
+  var dy = nw.y - se.y;
+  var dz = nw.z - se.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
@@ -188,7 +197,7 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
           tile.data.boundingSphere2D.center);
     };
 
-    var rects = subdivide(rect, subgridCount);
+    var rects = subdivideRect(rect, subgridCount);
     var centroids = rects.map(function(r) {
       return Cesium.Rectangle.center(r);
     });
@@ -209,8 +218,9 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
       });
 
       Cesium.when(promise, function(updatedPositions) {
-        createTileGeo(rects, updatedPositions.map(function(p) {
-          return p.height * heightScale;
+        createTileGeo(rects, updatedPositions.map(function(p, i) {
+          var dim = rectDimension(rects[i]) * 0.5;
+          return Math.floor(Math.max(0.0, p.height) * heightScale / dim) * dim;
         }), colours);
       });
 
