@@ -1,7 +1,8 @@
 var detailFactor = 4.0;
-var colourQuantize = 5.0;
+var colourQuantize = 6.0;
 var heightScale = 50.0;
 var granularityMultiplier = 20;
+var subgridCount = 2;
 
 var texCanvas = document.getElementById("tex-canvas");
 var texContext = texCanvas.getContext('2d');
@@ -124,6 +125,7 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
               rectangle : r,
               granularity : Cesium.Math.RADIANS_PER_DEGREE * granularityMultiplier,
               height : hs[i]
+            // , vertexFormat : Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
             }),
             attributes : {
               color : Cesium.ColorGeometryInstanceAttribute.fromColor(color)
@@ -142,7 +144,8 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
                 }
               },
               components : {
-                diffuse : 'texture2D(image, materialInput.st).rgb  * ' + tint
+                diffuse : 'texture2D(image, materialInput.st * vec2(0.8)).rgb  * ' + tint
+              // diffuse : 'vec3(materialInput.st, 0.0)'
               }
             }
           })
@@ -185,7 +188,7 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
           tile.data.boundingSphere2D.center);
     };
 
-    var rects = subdivide(rect, 2);
+    var rects = subdivide(rect, subgridCount);
     var centroids = rects.map(function(r) {
       return Cesium.Rectangle.center(r);
     });
@@ -259,7 +262,8 @@ BlockTileProvider.prototype.computeDistanceToTile = function(tile, frameState) {
     boundingSphere = tile.data.boundingSphere2D;
   }
 
-  return Math.max(0.0, Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(boundingSphere.center, frameState.camera.positionWC, subtractScratch)) - boundingSphere.radius);
+  return Math.max(0.0, Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(boundingSphere.center, frameState.camera.positionWC, subtractScratch))
+      - boundingSphere.radius);
 };
 
 BlockTileProvider.prototype.isDestroyed = function() {
