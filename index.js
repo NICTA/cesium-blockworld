@@ -2,7 +2,7 @@ var detailFactor = 1.0;
 var colourQuantize = 6.0;
 var heightScale = 50.0;
 var granularityMultiplier = 20;
-var subgridCount = 5;
+var subgridCount = 12;
 var online = true; // Allow coding when offline
 
 var texCanvas = document.getElementById("tex-canvas");
