@@ -1,8 +1,9 @@
-var detailFactor = 4.0;
+var detailFactor = 1.0;
 var colourQuantize = 6.0;
-var heightScale = 20.0;
+var heightScale = 50.0;
 var granularityMultiplier = 20;
-var subgridCount = 2;
+var subgridCount = 5;
+var online = true; // Allow coding when offline
 
 var texCanvas = document.getElementById("tex-canvas");
 var texContext = texCanvas.getContext('2d');
@@ -125,20 +126,65 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
       var tintColour = Cesium.Color.fromBytes(c[0], c[1], c[2], 255);
       var tint = 'vec3(' + quantize(tintColour.red) + ',' + quantize(tintColour.green) + ',' + quantize(tintColour.blue) + ')';
 
+      var vertexFormat = {
+        "position" : true,
+        "normal" : true,
+        "st" : true,
+        "binormal" : false,
+        "tangent" : false
+      };
+
+      // Note: We really want a mix of these 2 materials so we can use a per instance colour multiplied by a texture
+      var appearance;
+      if (1) {
+        appearance = new Cesium.PerInstanceColorAppearance();
+      } else {
+        appearance = new Cesium.MaterialAppearance({
+          material : new Cesium.Material({
+            fabric : {
+              type : 'DiffuseMap',
+              uniforms : {
+                image : 'textures/vignette.jpg'
+              },
+              components : {
+                diffuse : 'texture2D(image, materialInput.st).rgb  * ' + tint
+              // diffuse : 'vec3(materialInput.st, 0.0)'
+              }
+            }
+          })
+        });
+      }
+
       tile.data.primitive = new Cesium.Primitive({
         geometryInstances : rs.map(function(r, i) {
           var c = cs[i];
-          var color = Cesium.Color.fromBytes(c[0], c[1], c[2], 255);
+          var colour = Cesium.Color.fromBytes(c[0], c[1], c[2], 255);
           return new Cesium.GeometryInstance({
             geometry : new Cesium.RectangleGeometry({
               rectangle : r,
               granularity : Cesium.Math.RADIANS_PER_DEGREE * granularityMultiplier,
-              height : hs[i]
-            // , vertexFormat : Cesium.PerInstanceColorAppearance.VERTEX_FORMAT
+              height : hs[i],
+              vertexFormat : vertexFormat
             }),
             attributes : {
-              color : Cesium.ColorGeometryInstanceAttribute.fromColor(color)
+              color : Cesium.ColorGeometryInstanceAttribute.fromColor(colour)
             }
+          });
+        }),
+        appearance : appearance
+      });
+
+      tile.data.sides = new Cesium.Primitive({
+        geometryInstances : rs.map(function(r, i) {
+          var dim = rectDimension(rects[i]) * 0.5;
+
+          return new Cesium.GeometryInstance({
+            geometry : Cesium.WallGeometry.fromConstantHeights({
+              granularity : Cesium.Math.RADIANS_PER_DEGREE * granularityMultiplier,
+              positions : Cesium.Cartesian3.fromRadiansArray([ r.west, r.south, r.west, r.north, r.east, r.north, r.east, r.south, r.west, r.south ]),
+              maximumHeight : hs[i],
+              minimumHeight : 0.0
+            })
           });
         }),
         appearance : new Cesium.MaterialAppearance({
@@ -146,50 +192,20 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
             fabric : {
               type : 'DiffuseMap',
               uniforms : {
-                image : 'textures/gravel.png',
+                image : 'textures/vignette.jpg',
                 repeat : {
                   x : 1,
                   y : 1
                 }
               },
               components : {
-                diffuse : 'texture2D(image, materialInput.st * vec2(0.8)).rgb  * ' + tint
-              // diffuse : 'vec3(materialInput.st, 0.0)'
+                diffuse : 'texture2D(image, materialInput.st).rgb  * ' + tint
               }
+
             }
           })
         })
       });
-
-      // if (height > 0) {
-      if (1) {
-        tile.data.sides = new Cesium.Primitive({
-          geometryInstances : rs.map(function(r, i) {
-            return new Cesium.GeometryInstance({
-              geometry : Cesium.WallGeometry.fromConstantHeights({
-                granularity : Cesium.Math.RADIANS_PER_DEGREE * granularityMultiplier,
-                positions : Cesium.Cartesian3.fromRadiansArray([ r.west, r.south, r.west, r.north, r.east, r.north, r.east, r.south, r.west, r.south ]),
-                maximumHeight : hs[i],
-                minimumHeight : 0.0
-              })
-            });
-          }),
-          appearance : new Cesium.MaterialAppearance({
-            material : new Cesium.Material({
-              fabric : {
-                type : 'DiffuseMap',
-                uniforms : {
-                  image : 'textures/dirt-grass.png',
-                  repeat : {
-                    x : 4,
-                    y : 1
-                  }
-                }
-              }
-            })
-          })
-        });
-      }
 
       tile.data.boundingSphere3D = Cesium.BoundingSphere.fromRectangle3D(rect);
       tile.data.boundingSphere2D = Cesium.BoundingSphere.fromRectangle2D(rect, frameState.mapProjection);
@@ -202,9 +218,17 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
       return Cesium.Rectangle.center(r);
     });
 
+    var fauxTerrain = function(ps) {
+      var dfd = Cesium.when.defer();
+      dfd.resolve(ps.map(function(p) {
+        return new Cesium.Cartographic(p.longitude, p.latitude, Math.random() * 10000);
+      }));
+      return dfd.promise;
+    };
+
     // Query the terrain height of two Cartographic positions
     var positions = [ Cesium.Cartographic.fromRadians((rect.west + rect.east) * 0.5, (rect.north + rect.south) * 0.5) ];
-    var promise = Cesium.sampleTerrain(terrainProvider, Math.max(0, tile.level - 1), centroids);
+    var promise = online ? Cesium.sampleTerrain(terrainProvider, Math.max(0, tile.level - 1), centroids) : fauxTerrain(centroids);
 
     Cesium.when(imageReady, function() {
 
@@ -218,10 +242,11 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
       });
 
       Cesium.when(promise, function(updatedPositions) {
-        createTileGeo(rects, updatedPositions.map(function(p, i) {
+        var hs = updatedPositions.map(function(p, i) {
           var dim = rectDimension(rects[i]) * 0.5;
           return Math.floor(Math.max(0.0, p.height) * heightScale / dim) * dim;
-        }), colours);
+        });
+        createTileGeo(rects, hs, colours);
       });
 
     });
@@ -272,8 +297,7 @@ BlockTileProvider.prototype.computeDistanceToTile = function(tile, frameState) {
     boundingSphere = tile.data.boundingSphere2D;
   }
 
-  return Math.max(0.0, Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(boundingSphere.center, frameState.camera.positionWC, subtractScratch))
-      - boundingSphere.radius);
+  return Math.max(0.0, Cesium.Cartesian3.magnitude(Cesium.Cartesian3.subtract(boundingSphere.center, frameState.camera.positionWC, subtractScratch)) - boundingSphere.radius);
 };
 
 BlockTileProvider.prototype.isDestroyed = function() {
