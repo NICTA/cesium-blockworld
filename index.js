@@ -3,7 +3,7 @@ var colourQuantize = 6.0;
 var heightScale = 50.0;
 var granularityMultiplier = 20;
 var subgridCount = 5;
-var online = false; // Allow coding when offline
+var online = true; // Allow coding when offline
 
 var texCanvas = document.getElementById("tex-canvas");
 var texContext = texCanvas.getContext('2d');
@@ -134,103 +134,18 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
         "tangent" : false
       };
 
-      // Note: We really want a mix of these 2 materials so we can use a per instance colour multiplied by a texture
-      var appearance;
-      if (0) {
-        //appearance = new Cesium.PerInstanceColorAppearance();
-        var vertexShaderSource = "attribute vec3 position3DHigh;\nattribute vec3 position3DLow;\nattribute vec3 normal;\nattribute vec4 color;\nvarying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec4 v_color;\nvoid main()\n{\nvec4 p = czm_computePosition();\nv_positionEC = (czm_modelViewRelativeToEye * p).xyz;\nv_normalEC = czm_normal * normal;\nv_color = color;\ngl_Position = czm_modelViewProjectionRelativeToEye * p;\n}\n";
-        var fragmentShaderSource = "varying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec4 v_color;\nvoid main()\n{\nvec3 positionToEyeEC = -v_positionEC;\nvec3 normalEC;\n#ifdef FACE_FORWARD\nnormalEC = normalize(faceforward(v_normalEC, vec3(0.0, 0.0, 1.0), -v_normalEC));\n#else\nnormalEC = normalize(v_normalEC);\n#endif\nczm_materialInput materialInput;\nmaterialInput.normalEC = normalEC;\nmaterialInput.positionToEyeEC = positionToEyeEC;\nczm_material material = czm_getDefaultMaterial(materialInput);\nmaterial.diffuse = v_color.rgb;\nmaterial.alpha = v_color.a;\ngl_FragColor = czm_phong(normalize(positionToEyeEC), material);\n}\n";
-        appearance = new Cesium.Appearance({
-          "vertexShaderSource" : vertexShaderSource,
-          "fragmentShaderSource" : fragmentShaderSource,
-          "renderState": {
-            "depthTest": {
-              "enabled": true
-            },
-            "depthMask": false,
-            "blending": {
-              "enabled": true,
-              "equationRgb": 32774,
-              "equationAlpha": 32774,
-              "functionSourceRgb": 770,
-              "functionSourceAlpha": 770,
-              "functionDestinationRgb": 771,
-              "functionDestinationAlpha": 771
-            }
-          }
-        });
-        /*
-        appearance = {
-            "translucent": true,
-            "_vertexShaderSource": "attribute vec3 position3DHigh;\nattribute vec3 position3DLow;\nattribute vec3 normal;\nattribute vec4 color;\nvarying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec4 v_color;\nvoid main()\n{\nvec4 p = czm_computePosition();\nv_positionEC = (czm_modelViewRelativeToEye * p).xyz;\nv_normalEC = czm_normal * normal;\nv_color = color;\ngl_Position = czm_modelViewProjectionRelativeToEye * p;\n}\n",
-            "_fragmentShaderSource": "varying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec4 v_color;\nvoid main()\n{\nvec3 positionToEyeEC = -v_positionEC;\nvec3 normalEC;\n#ifdef FACE_FORWARD\nnormalEC = normalize(faceforward(v_normalEC, vec3(0.0, 0.0, 1.0), -v_normalEC));\n#else\nnormalEC = normalize(v_normalEC);\n#endif\nczm_materialInput materialInput;\nmaterialInput.normalEC = normalEC;\nmaterialInput.positionToEyeEC = positionToEyeEC;\nczm_material material = czm_getDefaultMaterial(materialInput);\nmaterial.diffuse = v_color.rgb;\nmaterial.alpha = v_color.a;\ngl_FragColor = czm_phong(normalize(positionToEyeEC), material);\n}\n",
-            "_renderState": {
-              "depthTest": {
-                "enabled": true
-              },
-              "depthMask": false,
-              "blending": {
-                "enabled": true,
-                "equationRgb": 32774,
-                "equationAlpha": 32774,
-                "functionSourceRgb": 770,
-                "functionSourceAlpha": 770,
-                "functionDestinationRgb": 771,
-                "functionDestinationAlpha": 771
-              }
-            },
-            "_closed": false,
-            "_vertexFormat": {
-              "position": true,
-              "normal": true,
-              "st": false,
-              "binormal": false,
-              "tangent": false
-            },
-            "_flat": false,
-            "_faceForward": true
-          };*/
-        console.log(JSON.stringify(appearance, undefined, 2));
-      } else {
-        appearance = new Cesium.MaterialAppearance({
-          material : new Cesium.Material({
-            fabric : {
-              type : 'DiffuseMap',
-              uniforms : {
-                image : 'textures/vignette.jpg'
-              },
-              components : {
-                diffuse : 'texture2D(image, materialInput.st).rgb' //  * ' + tint
-              // diffuse : 'vec3(materialInput.st, 0.0)'
-              }
-            }
-          })
-        });
-
-        console.log("++");
-        console.log(JSON.stringify(appearance, undefined, 2));
-
-        console.log("--");
-        
         var vertexShaderSource = "attribute vec4 color;\nattribute vec3 position3DHigh;\nattribute vec3 position3DLow;\nattribute vec3 normal;\nattribute vec2 st;\nvarying vec4 v_color;\nvarying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec2 v_st;\nvoid main()\n{\nv_color = color;\nvec4 p = czm_computePosition();\nv_positionEC = (czm_modelViewRelativeToEye * p).xyz;\nv_normalEC = czm_normal * normal;\nv_st = st;\ngl_Position = czm_modelViewProjectionRelativeToEye * p;\n}\n";
         var fragmentShaderSource = "varying vec4 v_color;\nvarying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec2 v_st;\nvoid main()\n{\nvec3 positionToEyeEC = -v_positionEC;\nvec3 normalEC;\n#ifdef FACE_FORWARD\nnormalEC = normalize(faceforward(v_normalEC, vec3(0.0, 0.0, 1.0), -v_normalEC));\n#else\nnormalEC = normalize(v_normalEC);\n#endif\nczm_materialInput materialInput;\nmaterialInput.normalEC = normalEC;\nmaterialInput.positionToEyeEC = positionToEyeEC;\nmaterialInput.st = v_st;\nczm_material material = czm_getMaterial(materialInput);\n#ifdef FLAT\ngl_FragColor = vec4(material.diffuse + material.emission, material.alpha);\n#else\ngl_FragColor = czm_phong(normalize(positionToEyeEC), material) * v_color;\n#endif\n}\n";
         
-        appearance = new Cesium.Appearance({
+        var appearance = new Cesium.Appearance({
             "material": new Cesium.Material({
               fabric : {
                 type : 'DiffuseMap',
                 uniforms : {
-                  image : 'textures/vignette.jpg'
-                },
-                components : {
-                  diffuse : 'texture2D(image, materialInput.st).rgb' //  * ' + tint
-                // diffuse : 'vec3(materialInput.st, 0.0)'
+                  image : 'textures/top-face.jpg'
                 }
               }
             }),
-            
-            // end material
-            
             
             "translucent": true,
             "vertexShaderSource": vertexShaderSource,
@@ -259,8 +174,6 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
                 "binormal": false,
                 "tangent": false
               },
-//              "vertexShaderSource": "attribute vec3 position3DHigh;\nattribute vec3 position3DLow;\nattribute vec3 normal;\nattribute vec2 st;\nvarying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec2 v_st;\nvoid main()\n{\nvec4 p = czm_computePosition();\nv_positionEC = (czm_modelViewRelativeToEye * p).xyz;\nv_normalEC = czm_normal * normal;\nv_st = st;\ngl_Position = czm_modelViewProjectionRelativeToEye * p;\n}\n",
-  //            "fragmentShaderSource": "varying vec3 v_positionEC;\nvarying vec3 v_normalEC;\nvarying vec2 v_st;\nvoid main()\n{\nvec3 positionToEyeEC = -v_positionEC;\nvec3 normalEC;\n#ifdef FACE_FORWARD\nnormalEC = normalize(faceforward(v_normalEC, vec3(0.0, 0.0, 1.0), -v_normalEC));\n#else\nnormalEC = normalize(v_normalEC);\n#endif\nczm_materialInput materialInput;\nmaterialInput.normalEC = normalEC;\nmaterialInput.positionToEyeEC = positionToEyeEC;\nmaterialInput.st = v_st;\nczm_material material = czm_getMaterial(materialInput);\n#ifdef FLAT\ngl_FragColor = vec4(material.diffuse + material.emission, material.alpha);\n#else\ngl_FragColor = czm_phong(normalize(positionToEyeEC), material);\n#endif\n}\n"
               "vertexShaderSource": vertexShaderSource,
               "fragmentShaderSource": fragmentShaderSource
           },
@@ -274,8 +187,6 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
             "flat": false,
             "faceForward": true
           }) ;
-        console.log(JSON.stringify(appearance, undefined, 2));
-      }
 
       tile.data.primitive = new Cesium.Primitive({
         geometryInstances : rs.map(function(r, i) {
@@ -314,14 +225,10 @@ BlockTileProvider.prototype.loadTile = function(context, frameState, tile) {
             fabric : {
               type : 'DiffuseMap',
               uniforms : {
-                image : 'textures/vignette.jpg',
-                repeat : {
-                  x : 1,
-                  y : 1
-                }
+                image : 'textures/dirt-grass.jpg'
               },
               components : {
-                diffuse : 'texture2D(image, materialInput.st).rgb  * ' + tint
+                diffuse : 'texture2D(image, materialInput.st).rgb  * (vec3(1.0,1.0,1.0) + ' + tint + ') * vec3(0.5,0.5,0.5)'
               }
 
             }
